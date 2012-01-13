@@ -1,0 +1,10 @@
+## Interface: 40300
+## Version: 0.1
+## Author: SinaC
+## Title: Baggins Equipment Set
+## Credits: Nargiddley
+## Notes: Create bags and sections for wow built-in equipment set
+## URL: https://github.com/SinaC/Baggins_EquipmentSet
+## RequiredDeps: Baggins
+
+Baggins_EquipmentSet.lua
