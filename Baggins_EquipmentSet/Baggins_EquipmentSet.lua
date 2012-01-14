@@ -1,25 +1,32 @@
 -- Add EquipmentSet category/section/bags in Baggins
 local ADDON_NAME, ns = ...
 
--- TODO: remove category/section not related to currently logged character
+-- TODO:
+--	Baggins takes a lot of time when we save an equipment set
+--	Optimize
 
 if not Baggins then return end
 
 local dewdrop = AceLibrary("Dewdrop-2.0")
 if not dewdrop then return end
 
+local tekWarningDisplayed = false
+local tekDebugFrame = tekDebug and tekDebug:GetFrame(ADDON_NAME) -- tekDebug support
 local function debug(lvl, ...)
 	local params = strjoin(" ", ...)
-	--print("Baggins_EquipmentSet:"..params)
+	if tekDebugFrame then
+		tekDebugFrame:AddMessage(params)
+	else
+		if not tekWarningDisplayed then
+			print("tekDebug not found. Debug message disabled")
+			tekWarningDisplayed = true
+		end
+	end
 end
 
 local EquipmentSetBagName = "EquipmentSet" -- localizable
 local EquipmentSetBankBagName = "BankEquipmentSet" -- localizable
 local RuleType = "EquipmentSet"
-
--- 1 bag
--- n categories  EquipmentSet1, EquipmentSet2, ... (n = max(oldN, GetNumEquipmentSets())
--- n sections [EquipmentSet1Name], [EquipmentSet2Name), ... (n = min(oldN, GetNumEquipmentSets())
 
 -- Add custom rule
 Baggins:AddCustomRule(RuleType, {
@@ -81,7 +88,7 @@ local function GetBag(bagName, isBank)
 	local bag = Baggins.db.profile.bags[bagID]
 	bag.isBank = isBank
 	bag.openWithAll = true
-	debug(100,"bag:"..tostring(bag).." "..tostring(bagID).." "..tostring(bagName))
+	--debug(100,"bag:"..tostring(bag).." "..tostring(bagID).." "..tostring(bagName))
 	return bag, bagID
 end
 
@@ -100,19 +107,29 @@ local function UpdateCategories()
 		end
 		-- Set rule to category
 		table.remove(category, 1) -- only one rule
-		debug(100, "Assigning rule "..RuleType.."["..tostring(equipmentSetName).."] to category "..categoryName)
+		debug(100, "Assign rule "..RuleType.."["..tostring(equipmentSetName).."] to category "..categoryName)
 		local rule = {type = RuleType, operation = "OR", setName = equipmentSetName}
 		table.insert(category, rule)
 	end
-	-- Disable unused categories
+	-- -- Disable unused categories
+	-- for i = numSets+1, 100, 1 do
+		-- local categoryName = "EquipmentSet"..i
+		-- local category = Baggins.db.profile.categories[categoryName]
+		-- if not category then
+			-- break
+		-- end
+		-- debug(100, "Disable category:"..categoryName)
+		-- table.remove(category, 1) -- only one rule
+	-- end
+	-- Delete unused categories
 	for i = numSets+1, 100, 1 do
 		local categoryName = "EquipmentSet"..i
 		local category = Baggins.db.profile.categories[categoryName]
 		if not category then
 			break
 		end
-		debug(100, "Disable category:"..categoryName)
-		table.remove(category, 1) -- only one rule
+		debug(100, "Delete category:"..categoryName)
+		Baggins:RemoveCategory(categoryName)
 	end
 end
 
@@ -135,25 +152,26 @@ local function UpdateSections(bag, bagID)
 		-- Set category
 		section.cats = {} -- remove any categories
 		local categoryName = "EquipmentSet"..i
-		debug(100, "Assigning category "..categoryName.." to section "..sectionName.." in bag "..bag.name)
+		debug(100, "Assign category "..categoryName.." to section "..sectionName.." in bag "..bag.name)
 		Baggins:AddCategory(bagID, i, categoryName)
 	end
-	-- Disable unused sections
-	for i = numSets+1, #bag.sections, 1 do
-		debug(100, "Disable section:"..sectionName)
-		local section = bag.sections[i]
-		section.cats = {} -- remove any categories
+	---- Disable unused sections
+	-- for i = numSets+1, #bag.sections, 1 do
+		-- local section = bag.sections[i]
+		-- debug(100, "Disable section:"..section.name)
+		-- section.cats = {} -- remove any categories
+	-- end
+	-- Remove unused sections
+	local numSectionsToRemove = #bag.sections - numSets
+	for i = 1, numSectionsToRemove, 1 do
+		local index = numSets+1
+		local section = bag.sections[index]
+		debug(100, "Delete section:"..section.name)
+		Baggins:RemoveSection(bagID, index)
 	end
 end
 
-
-local _Baggins_OnEnable = Baggins.OnEnable -- save original function
-function Baggins:OnEnable(firstload)
-	-- call original function
-	_Baggins_OnEnable(self, firstload)
-
-	if not Baggins.db.profile.bags or not Baggins.db.profile.categories then return end
-
+local function UpdateBagginsEquipmentSet()
 	-- Update categories
 	UpdateCategories()
 
@@ -171,6 +189,24 @@ function Baggins:OnEnable(firstload)
 	Baggins:UpdateBags()
 	Baggins:UpdateLayout()
 end
+
+local _Baggins_OnEnable = Baggins.OnEnable -- save original function
+function Baggins:OnEnable(firstload)
+	-- call original function
+	_Baggins_OnEnable(self, firstload)
+
+	if not Baggins.db.profile.bags or not Baggins.db.profile.categories then return end
+
+	UpdateBagginsEquipmentSet()
+end
+
+local handler = CreateFrame("Frame", "Baggins_EquipmentSet")
+handler:RegisterEvent("EQUIPMENT_SETS_CHANGED")
+handler:SetScript("OnEvent", function(self, event)
+	debug(100, "EQUIPMENT_SETS_CHANGED")
+	UpdateBagginsEquipmentSet()
+end)
+
 
 --[[
 function Baggins:OnEnable(firstload)
