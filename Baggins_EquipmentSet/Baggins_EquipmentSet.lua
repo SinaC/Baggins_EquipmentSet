@@ -2,14 +2,23 @@
 local ADDON_NAME, ns = ...
 
 -- TODO:
---	Baggins takes a lot of time when we save an equipment set
---	Optimize
+--	Baggins takes a lot of time when saving an equipment set
+--	localization
 
 if not Baggins then return end
 
 local dewdrop = AceLibrary("Dewdrop-2.0")
 if not dewdrop then return end
 
+-- Constants
+local EquipmentSetBagName = "EquipmentSet" -- localizable
+local EquipmentSetBankBagName = "BankEquipmentSet" -- localizable
+-- local ArmorCategoryName = "Armure" -- localizable
+-- local WeaponsCategoryName = "Armes" -- localizable
+local RuleTypeOne = "EquipmentSet"
+local RuleTypeAny = "AnyEquipmentSet"
+
+-- tekDebug
 local tekWarningDisplayed = false
 local tekDebugFrame = tekDebug and tekDebug:GetFrame(ADDON_NAME) -- tekDebug support
 local function debug(lvl, ...)
@@ -24,15 +33,11 @@ local function debug(lvl, ...)
 	end
 end
 
-local EquipmentSetBagName = "EquipmentSet" -- localizable
-local EquipmentSetBankBagName = "BankEquipmentSet" -- localizable
-local RuleType = "EquipmentSet"
-
--- Add custom rule
-Baggins:AddCustomRule(RuleType, {
+-- Add custom rule (a particular equipment set)
+Baggins:AddCustomRule(RuleTypeOne, {
 	DisplayName = "Equipment Set", -- localizable
 	Description = "Filter by equipment set", -- localizable
-	Matches = function(bag,slot,rule)
+	Matches = function(bag, slot, rule)
 		local isInSet, setName = GetContainerItemEquipmentSetInfo(bag, slot) -- setName is a CSV of sets
 		if isInSet then
 			local tokens = { strsplit(", ", setName) }
@@ -65,6 +70,32 @@ Baggins:AddCustomRule(RuleType, {
 					"arg1", equipmentSetName
 				)
 			end
+		end
+	end,
+})
+
+-- Add custom rule (any equipment set)
+Baggins:AddCustomRule(RuleTypeAny, {
+	DisplayName = "Any equipment Set", -- localizable
+	Description = "Filter if in an equipment set", -- localizable
+	Matches = function(bag, slot, rule)
+		-- local texture, itemCount, locked, quality, readable, lootable, itemLink = GetContainerItemInfo(bag, slot)
+		local isInSet, setName = GetContainerItemEquipmentSetInfo(bag, slot)
+		-- if isInSet then
+			-- print("ANY:"..tostring(texture).."  "..tostring(isInSet).."  "..tostring(setName))
+		-- end
+		if isInSet then
+			return true
+		else
+			return false
+		end
+	end,
+	GetName = function(rule) 
+		return "Any equipment Set"
+	end,
+	DewDropOptions = function(rule, level, value) 
+		if level == 1 then
+			dewdrop:AddLine("text", "Any equipment Set", "isTitle", true) -- localizable
 		end
 	end,
 })
@@ -107,8 +138,8 @@ local function UpdateCategories()
 		end
 		-- Set rule to category
 		table.remove(category, 1) -- only one rule
-		debug(100, "Assign rule "..RuleType.."["..tostring(equipmentSetName).."] to category "..categoryName)
-		local rule = {type = RuleType, operation = "OR", setName = equipmentSetName}
+		debug(100, "Assign rule "..RuleTypeOne.."["..tostring(equipmentSetName).."] to category "..categoryName)
+		local rule = {type = RuleTypeOne, operation = "OR", setName = equipmentSetName}
 		table.insert(category, rule)
 	end
 	-- -- Disable unused categories
@@ -190,6 +221,19 @@ local function UpdateBagginsEquipmentSet()
 	Baggins:UpdateLayout()
 end
 
+-- local function UpdateBagginsArmorWeaponsCategories()
+	-- -- Get armor category
+	-- local armorCategory = Baggins.db.profile.categories[ArmorCategoryName]
+	-- if armorCategory then
+-- print("armor category found")
+	-- end
+
+	-- local weaponsCategory = Baggins.db.profile.categories[WeaponsCategoryName]
+	-- if weaponsCategory then
+-- print("weapons category found")
+	-- end
+-- end
+
 local _Baggins_OnEnable = Baggins.OnEnable -- save original function
 function Baggins:OnEnable(firstload)
 	-- call original function
@@ -198,6 +242,7 @@ function Baggins:OnEnable(firstload)
 	if not Baggins.db.profile.bags or not Baggins.db.profile.categories then return end
 
 	UpdateBagginsEquipmentSet()
+	-- UpdateBagginsArmorWeaponsCategories()
 end
 
 local handler = CreateFrame("Frame", "Baggins_EquipmentSet")
@@ -262,8 +307,8 @@ function Baggins:OnEnable(firstload)
 			Baggins:NewCategory(categoryName)
 			-- add rule to category
 			local category = Baggins.db.profile.categories[categoryName]
-			debug(100, "Assigning rule "..RuleType.." to category "..categoryName)
-			local rule = {type = RuleType, operation = "OR", setName = equipmentSetName}
+			debug(100, "Assigning rule "..RuleTypeOne.." to category "..categoryName)
+			local rule = {type = RuleTypeOne, operation = "OR", setName = equipmentSetName}
 			table.insert(category, rule)
 		end
 		debug(100,"category:"..tostring(categoryName))
